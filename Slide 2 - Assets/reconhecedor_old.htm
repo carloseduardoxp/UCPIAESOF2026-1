@@ -1,0 +1,1225 @@
+<HTML>
+    <HEAD>
+         <TITLE> Aplicações em Redes Neurais - 27/09/03 </TITLE>    
+         <SCRIPT language=JavaScript>
+             doc = window.document		// uma manipulacaozinha para o programa ficar independente de browser
+             camoculta = 10;		//numero de neuronios da camada oculta
+             u = 0.01;			//taxa de aprendizagem
+             Epocas = 0;			//contador de epocas treinadas
+             EMQ = 1;			//apurador do erro medio quadratico
+             FinalizaTreinamento = 0;	//flag sinalizadora do fim do treinamento
+             padroes = new Array(10);	// matriz com os padores de entrada a serem apresentados no aprendizado
+             padroes[0] = new Array(35); padroes[1] = new Array(35); padroes[2] = new Array(35); padroes[3] = new Array(35); padroes[4] = new Array(35); padroes[5] = new Array(35); padroes[6] = new Array(35); padroes[7] = new Array(35); padroes[8] = new Array(35); padroes[9] = new Array(35);
+             classes = new Array(10);
+             // gabarito de resultados que a rede neural deve perseguir
+             //  classes[0] = new Array(1,-1,-1,-1,-1,-1,-1,-1,-1,-1); classes[1] = new Array(-1,1,-1,-1,-1,-1,-1,-1,-1,-1);classes[2] = new Array(-1,-1,1,-1,-1,-1,-1,-1,-1,-1);classes[3] = new Array(-1,-1,-1,1,-1,-1,-1,-1,-1,-1);classes[4] = new Array(-1,-1,-1,-1,1,-1,-1,-1,-1,-1);classes[5] = new Array(-1,-1,-1,-1,-1,1,-1,-1,-1,-1);classes[6] = new Array(-1,-1,-1,-1,-1,-1,1,-1,-1,-1);classes[7] = new Array(-1,-1,-1,-1,-1,-1,-1,1,-1,-1);classes[8] = new Array(-1,-1,-1,-1,-1,-1,-1,-1,1,-1);classes[9] = new Array(-1,-1,-1,-1,-1,-1,-1,-1,-1,1);
+             classes[0] = new Array(1,0,0,0,0,0,0,0,0,0); classes[1] = new Array(0,1,0,0,0,0,0,0,0,0);classes[2] = new Array(0,0,1,0,0,0,0,0,0,0);classes[3] = new Array(0,0,0,1,0,0,0,0,0,0);classes[4] = new Array(0,0,0,0,1,0,0,0,0,0);classes[5] = new Array(0,0,0,0,0,1,0,0,0,0);classes[6] = new Array(0,0,0,0,0,0,1,0,0,0);classes[7] = new Array(0,0,0,0,0,0,0,1,0,0);classes[8] = new Array(0,0,0,0,0,0,0,0,1,0);classes[9] = new Array(0,0,0,0,0,0,0,0,0,1); //saída desejada da rede
+             // inicialização de variáveis
+             wo = new Array(36);			//inicializa os pesos da camada oculta (cada neuronio tem 36 entradas)
+             ws = new Array(camoculta+1);		//inicializa os pesos da camada de saida (cada neuronio tem entradas de todos os da cam.oculta e bias)
+             Intermediario = new Array(camoculta+1); //inicializa vetor intermediario, usado p/ armazenar saida da camada oculta
+             input = new Array(35);		//inicializa vetor que contera valores de entrada (35 pontos de entrada da matriz 7x6)
+             deltaSaida = new Array(10);		//gradiente local dos neuronios da camada de saida (10 neuronios de classificacao na cam.saida)
+             deltaOculta = new Array(camoculta);	//gradiente local dos neuronios da camada oculta (numero de neuronios definido pelo usuario)
+
+             if (document.images)  //
+             {
+                   wp = new Image(10,10); wp.src = "wpix.gif";	//imagens que servem de base para gerar figuras de entrada (branco)
+                   bp = new Image(10,10); bp.src = "bpix.gif"; 	//preto
+             }
+
+             function cosh(x) 
+             {				//funcao coseno hiperbolico utilizando definicoes da bib.Math
+	             return (Math.exp(x)+Math.exp(-x))/2;
+             }
+             function sinh(x) 
+             {				//funcao seno hiperbolico utilizando def. da bib.Math
+	             return (Math.exp(x)-Math.exp(-x))/2;
+             }
+             function tanh(x) 
+             {				//funcao de ativacao tanh proveniente de cosh e sinh
+	             return sinh(x)/cosh(x);
+             }
+
+             function ParaTreinamento()
+             {
+	             FinalizaTreinamento = 1;
+             }
+  
+             function inicializa()
+             {			//(re-)inicializa varias variaveis			 
+                          //	DisplayEpocas.value=0;
+	               camoculta = document.getElementById('CamadaOculta').value;		//numero de neuronios da camada oculta
+  	               ws = new Array(camoculta+1);		//(re-)inicializa os pesos da camada de saida (cada neuronio tem entradas de todos os da cam.oculta e bias)
+	               Intermediario = new Array(camoculta+1); //(re-)inicializa o vetor intermediario (saida da cam.oculta)
+  	               deltaOculta = new Array(camoculta);	//(re-)inicializa gradiente local dos neuronios da camada oculta (numero de neuronios definido pelo usuario)
+  	               u = document.getElementById('TaxaAprendizagem').value;		//taxa de aprendizagem				   
+  	               Epocas = 0;				//contador de epocas treinadas
+  	               EMQ = 1;				//apurador do erro medio quadratico
+	               for (i=0;i<10;i++)
+	               {			//inicializa estado dos botoes de teste/display
+		                b = eval(document.getElementById('Botao'+i));		//cada botao
+		                Realca(b,'#FFFFFF',255);	//inicializa com branco
+	               }
+	               for (i=0; i<=35; i++)
+	               {			// vetores da camada oculta
+		                wo[i] = new Array(camoculta);
+		                for (j=0; j<=(camoculta - 1); j++)
+		                {
+			                 wo[i][j] = (Math.random()-0.5)*2.4/35; //gera números aleatórios entre 0 e 1
+		                }
+	               }
+	               for (i=0; i<=camoculta; i++)
+	               {			// vetores da camada saida
+		                ws[i] = new Array(10);
+		                for (j=0; j<=9; j++)
+		                {
+			                 ws[i][j] = (Math.random()-0.5)*2.4/(camoculta);
+		                }
+	               }
+	               document.getElementById('Status').value = 'Epocas: '+Epocas+' - Erro Médio Quadrático: '+EMQ;				  
+             }
+
+             function mult(Ma,Mb)
+             {			// multiplica um vetor de entrada (A) por uma matriz com os pesos de cada neuronio (B)
+	               ca = Ma.length;			//numero de colunas em A =36
+	               la = 1;				//linhas em A   as matrizes de entrada,saida da cam.oculta e saida da rede sao sempre 1xN
+	               lb = Mb.length;			//numero de linhas em B = 36
+	               cb = Mb[0].length;		//numero de colunas em B, ou seja, o número de camadas ocultas
+	               result = new Array(cb); //result vai ter o valor dos pesos
+	               for (i=0; i<cb; i++)
+	               {		//para cada neuronio da proxima camada
+		               res = 0;		//zera somatorio do resultado
+		               for (j=0; j<lb; j++)
+		               {   //para cada uma das entradas de cada neuronio
+			               res = res + Ma[j]*Mb[j][i];	//calcula o efeito de cada entrada com seu peso especifico
+		               }
+		               result[i] = res;			//a saida deste neuronio eh guardada em res
+	               }
+	               return result;					//retorno do valor da funcao
+             }
+
+             function toggle(pixel)
+             {		//inverte a cor do pixel (elemento de entrada)
+	               if (pixel.src == wp.src)
+	               {	//se for branco
+		              pixel.src = bp.src;	//fica preto
+	               }
+	               else 
+	               {
+		              pixel.src = wp.src;	//senao fica branco
+	               }
+             }
+  
+             function leEntradas()
+             {		//le os bits das figuras de entradas (FUNCIONA)
+	               for (i=0; i<=9; i++) //9 pois sao 10 numeros, 0 a 9
+	               {		
+		                for (j=0; j<35; j++) // 35 pois é o número total de bits na figura
+		                {
+			                pixel = eval('p' + i + (Math.floor(j/5)+1) + (j - Math.floor(j/5)*5 + 1) +'.src'); //por exemplo p011.src
+			                pixelimg = pixel.substring(pixel.length - 8);
+			                if (pixelimg == 'wpix.gif')
+			                {	//se for branco
+				                 padroes[i][j] = 0;	//valor do bit é ZERO
+			                }
+			                else 
+			                {
+				                 padroes[i][j] = 1;	//valor do bit é UM
+			                }
+		                }
+	                }
+              }
+
+              function propaga(entrada)
+              {		//propaga o padrao de entrada pela rede neural e retorna um vetor de ativacao 
+	               input = new Array(36);		//criacao de um vetor de entrada
+	               input[0] = 1;			//valor de ativacao do bias
+	               for (i=1;i<=35;i++)
+	               {
+		                input[i] = padroes[entrada][i-1]; //recuperacao dos valores dos padroes, se o cara clicou no 4 por exemplo entrada vale 4
+	               }
+	               SaidaOculta = mult(input,wo);		//saida da camada oculta eh a propagacao da entrada pela cam.oculta
+	               //os pesos wo e ws pela primeira vez sao valores randomicos, mas depois com treinamento eles ficam valores melhorados
+	               for (i=0;i<(SaidaOculta.length);i++)
+	               {
+		                 SaidaOculta[i] = 1.7159*tanh((2/3)*SaidaOculta[i]); 		//funcao de ativacao da camada oculta
+	               }
+	               input = new Array(camoculta+1);		//agora INPUT eh a entrada da camada de saida
+	               input[0] = 1;				// valor de ativacao do bias
+	               for (i=1;i<=camoculta;i++)
+	               {
+		                 input[i] = SaidaOculta[i-1]; 	//recuperacao dos valores propagados pela cam.oculta
+	               }
+	               Intermediario = input;			//armazena valor de saida da cam.oculta no vetor intermediario
+	               SaidaRede = mult(input,ws);
+	               for (i=0;i<(SaidaRede.length);i++)
+	               {
+		                 SaidaRede[i] = 1.7159*tanh((2/3)*SaidaRede[i]); 		//funcao de ativacao da camada oculta
+	               }
+	               return SaidaRede;
+              }
+
+              function testa(vetor)
+              {			//propaga vetor de entrada pela rede neural e exibe resultado atraves das cores dos botoes de entrada
+	               leEntradas();
+	               for (i=0;i<10;i++)
+	               {			//faz com que todos os botoes fiquem brancos, o default
+		                b = (eval('Botao'+i));		//a funcao eval concatena
+		                b.style.background = '#ffffff'  // faz botao 'i' ficar branco
+	               }
+	               RespRede = propaga(vetor);		//resposta da rede neural
+                   //alert(RespRede);
+	               CoresBotoes = new Array(RespRede.length);	//mostrar resultado como sendo uma intensidade da cor dos botões
+	               for (i=0;i<(RespRede.length);i++)
+	               {		//para cada resultado de saída...
+	                    c = eval(document.getElementById('quantos'+i)); //para jogar nos edits o numero
+		                if (RespRede[i]>0)
+		                {
+			                 RespRede[i] = 255-(Math.floor((RespRede[i])*255));		//transforma valores entre 0 e 1 numa amplitude de 0 a 255. Math floor pega a parte inteira de uma variável
+		                }
+		                else
+		                {
+			                 RespRede[i] = 255;						//se for menor que zero, na verdade é zero!
+		                }
+                        c.value = RespRede[i];
+		                CoresBotoes[i] = RespRede[i].toString(16); //converte valor decimal em hexa para ser usado como cor...16 para passar para hexa
+		                b = eval('Botao'+i);							//recupera iésimo botão
+		                Realca(b,'#'+CoresBotoes[i]+CoresBotoes[i]+CoresBotoes[i],RespRede[i]);	//dá ao iésimo botão a cor correspondente a sua intensidade de saída
+	               }
+              }           			                                       
+
+              function Realca(alvo,cor,valor)
+              {			//realca a saida da rede neural
+	               alvo.style.background = cor;			//muda-se o background
+	               if (valor < 128)
+	               {
+		                alvo.style.color = '#EEEEEE';		//troca fonte se necessario
+	               }
+	               else
+	               {
+		                alvo.style.color = '#000000';		//troca fonte se necessario
+	               }
+              }
+
+              function TiraRealce(alvo)
+              {			//faz todas as saidas ficarem padrao (branco)
+	               alvo.style.background = '#FFFFFF';	//background branco
+	               alvo.style.color = '#000000';		//fonte preta
+              }
+
+              function Mostra(objeto,valor)
+              {
+	               objeto.value = valor.toString();
+              }
+
+              function Treinamento()
+              {
+	               leEntradas();		   
+	               FinalizaTreinamento = 0;		//dasabilita flag de fim-de-treinamento				   
+	               n = 0;
+				   
+	               while(n < DisplayEpocas.value)
+	               {
+		                n++;
+		                Epocas = Epocas +1;			//atualiza contador de epocas
+		                document.getElementById('Status').value ='Epocas: '+Epocas+' - Erro Médio Quadrático: '+EMQ;
+		                somaErro = 0;				//contador para verificacao da aprendizagem
+		                h = new Array(10);			//vetor que contera a resposta correta
+		                for (cadaEntrada=0;cadaEntrada<10;cadaEntrada++)						
+		                {			//"varre" todos os vetores de entrada
+			                 y = propaga(cadaEntrada);			//propaga caractere 'cadaEntrada' pela rede neural
+			                 for (j=0;j<10;j++)
+			                 {
+ 				                   h[j] = classes[cadaEntrada][j];		//vetor de saida correto (desejado)
+			                 }
+			                 for (j=0;j<10;j++)
+			                 {			//para cada valor de y, calcula delta da cam.saida
+				                   deltaSaida[j] = (h[j]-y[j])*(1-(y[j]*y[j]));	//calcula delta da camada de saida de acordo com o algoritmo backpropagation
+			                 }
+			                 for (j=0;j<10;j++)
+			                 {			//para cada valor de y, calcula delta da cam.saida
+				                   somaErro = somaErro+ (h[j]-y[j])*(h[j]-y[j])*0.5;
+			                 }
+			                 EMQ = (EMQ + somaErro)/(cadaEntrada + 1);
+			                 for (j=0;j<camoculta;j++)
+			                 {	//calculo do gradiente da camada oculta (p/ cada neuronio da camada oculta)
+				                    aux = 0;		//var. auxiliar zerada.
+				                    for(k=0;k<10;k++)
+				                    {	//o peso de cada neuronio da camada de saida influencia o resultado
+					                     aux = aux + deltaSaida[k]*ws[j+1][k];		//soma de todas as contribuicoes deste sinal em todos os neuronios de saida
+				                    }
+				                    deltaOculta[j] = (1-(Intermediario[j+1]*Intermediario[j+1]))*aux;
+			                 }
+			                 for (j=0;j<=camoculta;j++)
+			                 {	//atualizar pesos dos neuronios da camada de saida (p/ cada valor de saida da camada oculta)
+				                   for (k=0;k<10;k++)
+				                   {	//para cada neuronio da camada de saida
+					                    ws[j][k] = ws[j][k] + Intermediario[j]*deltaSaida[k]*u;		//atualiza cada peso de acordo com a taxa de aprendizagem
+				                   }
+			                 }
+			                 for (j=0;j<36;j++)
+			                 {			//cada elemento de entrada de um neuronio oculto
+				                   for(k=0;k<camoculta;k++)
+				                   {	//cada neuronio oculto
+					                    if (j==0)
+					                    {		// entrada do bias
+						                     wo[j][k] = wo[j][k] + 1*deltaOculta[k]*u;	//atualiza pesos
+					                    }
+					                    else
+					                    {			//entrada normal
+						                     wo[j][k] = wo[j][k] + padroes[cadaEntrada][j-1]*deltaOculta[k]*u; // atualiza pesos
+					                    }
+				                   }
+			                 }
+		                }//fim for
+	               } // fim while
+               }
+
+               function resetEntradas()
+               {	// restaura o valor default nas entradas
+	                 p011.src=wp.src; p012.src=bp.src; p013.src=bp.src; p014.src=bp.src; p015.src=wp.src;	p021.src=bp.src; p022.src=wp.src; p023.src=wp.src; p024.src=wp.src; p025.src=bp.src;	p031.src=bp.src; p032.src=wp.src; p033.src=wp.src; p034.src=wp.src; p035.src=bp.src; p041.src=bp.src; p042.src=wp.src; p043.src=wp.src; p044.src=wp.src; p045.src=bp.src; p051.src=bp.src; p052.src=wp.src; p053.src=wp.src; p054.src=wp.src; p055.src=bp.src; p061.src=bp.src; p062.src=wp.src; p063.src=wp.src; p064.src=wp.src; p065.src=bp.src; p071.src=wp.src; p072.src=bp.src; p073.src=bp.src; p074.src=bp.src; p075.src=wp.src;
+	                 p111.src=wp.src; p112.src=wp.src; p113.src=bp.src; p114.src=wp.src; p115.src=wp.src;	p121.src=wp.src; p122.src=bp.src; p123.src=bp.src; p124.src=wp.src; p125.src=wp.src;	p131.src=wp.src; p132.src=wp.src; p133.src=bp.src; p134.src=wp.src; p135.src=wp.src; p141.src=wp.src; p142.src=wp.src; p143.src=bp.src; p144.src=wp.src; p145.src=wp.src; p151.src=wp.src; p152.src=wp.src; p153.src=bp.src; p154.src=wp.src; p155.src=wp.src; p161.src=wp.src; p162.src=wp.src; p163.src=bp.src; p164.src=wp.src; p165.src=wp.src; p171.src=wp.src; p172.src=bp.src; p173.src=bp.src; p174.src=bp.src; p175.src=wp.src;
+	                 p211.src=wp.src; p212.src=bp.src; p213.src=bp.src; p214.src=bp.src; p215.src=wp.src;	p221.src=bp.src; p222.src=wp.src; p223.src=wp.src; p224.src=wp.src; p225.src=bp.src;	p231.src=wp.src; p232.src=wp.src; p233.src=wp.src; p234.src=wp.src; p235.src=bp.src; p241.src=wp.src; p242.src=wp.src; p243.src=wp.src; p244.src=bp.src; p245.src=wp.src; p251.src=wp.src; p252.src=wp.src; p253.src=bp.src; p254.src=wp.src; p255.src=wp.src; p261.src=wp.src; p262.src=bp.src; p263.src=wp.src; p264.src=wp.src; p265.src=wp.src; p271.src=bp.src; p272.src=bp.src; p273.src=bp.src; p274.src=bp.src; p275.src=bp.src;
+	                 p311.src=bp.src; p312.src=bp.src; p313.src=bp.src; p314.src=bp.src; p315.src=bp.src;	p321.src=wp.src; p322.src=wp.src; p323.src=wp.src; p324.src=bp.src; p325.src=wp.src;	p331.src=wp.src; p332.src=wp.src; p333.src=bp.src; p334.src=wp.src; p335.src=wp.src; p341.src=wp.src; p342.src=wp.src; p343.src=wp.src; p344.src=bp.src; p345.src=wp.src; p351.src=wp.src; p352.src=wp.src; p353.src=wp.src; p354.src=wp.src; p355.src=bp.src; p361.src=bp.src; p362.src=wp.src; p363.src=wp.src; p364.src=wp.src; p365.src=bp.src; p371.src=wp.src; p372.src=bp.src; p373.src=bp.src; p374.src=bp.src; p375.src=wp.src;
+	                 p411.src=wp.src; p412.src=wp.src; p413.src=wp.src; p414.src=bp.src; p415.src=wp.src;	p421.src=wp.src; p422.src=wp.src; p423.src=bp.src; p424.src=bp.src; p425.src=wp.src;	p431.src=wp.src; p432.src=bp.src; p433.src=wp.src; p434.src=bp.src; p435.src=wp.src; p441.src=bp.src; p442.src=wp.src; p443.src=wp.src; p444.src=bp.src; p445.src=wp.src; p451.src=bp.src; p452.src=bp.src; p453.src=bp.src; p454.src=bp.src; p455.src=bp.src; p461.src=wp.src; p462.src=wp.src; p463.src=wp.src; p464.src=bp.src; p465.src=wp.src; p471.src=wp.src; p472.src=wp.src; p473.src=wp.src; p474.src=bp.src; p475.src=wp.src;
+	                 p511.src=bp.src; p512.src=bp.src; p513.src=bp.src; p514.src=bp.src; p515.src=bp.src;	p521.src=bp.src; p522.src=wp.src; p523.src=wp.src; p524.src=wp.src; p525.src=wp.src;	p531.src=bp.src; p532.src=bp.src; p533.src=bp.src; p534.src=bp.src; p535.src=wp.src; p541.src=wp.src; p542.src=wp.src; p543.src=wp.src; p544.src=wp.src; p545.src=bp.src; p551.src=wp.src; p552.src=wp.src; p553.src=wp.src; p554.src=wp.src; p555.src=bp.src; p561.src=bp.src; p562.src=wp.src; p563.src=wp.src; p564.src=wp.src; p565.src=bp.src; p571.src=wp.src; p572.src=bp.src; p573.src=bp.src; p574.src=bp.src; p575.src=wp.src;
+	                 p611.src=wp.src; p612.src=wp.src; p613.src=bp.src; p614.src=bp.src; p615.src=wp.src;	p621.src=wp.src; p622.src=bp.src; p623.src=wp.src; p624.src=wp.src; p625.src=wp.src;	p631.src=bp.src; p632.src=wp.src; p633.src=wp.src; p634.src=wp.src; p635.src=wp.src; p641.src=bp.src; p642.src=bp.src; p643.src=bp.src; p644.src=bp.src; p645.src=wp.src; p651.src=bp.src; p652.src=wp.src; p653.src=wp.src; p654.src=wp.src; p655.src=bp.src; p661.src=bp.src; p662.src=wp.src; p663.src=wp.src; p664.src=wp.src; p665.src=bp.src; p671.src=wp.src; p672.src=bp.src; p673.src=bp.src; p674.src=bp.src; p675.src=wp.src;
+	                 p711.src=bp.src; p712.src=bp.src; p713.src=bp.src; p714.src=bp.src; p715.src=bp.src;	p721.src=wp.src; p722.src=wp.src; p723.src=wp.src; p724.src=wp.src; p725.src=bp.src;	p731.src=wp.src; p732.src=wp.src; p733.src=wp.src; p734.src=bp.src; p735.src=wp.src; p741.src=wp.src; p742.src=wp.src; p743.src=bp.src; p744.src=wp.src; p745.src=wp.src; p751.src=wp.src; p752.src=bp.src; p753.src=wp.src; p754.src=wp.src; p755.src=wp.src; p761.src=wp.src; p762.src=bp.src; p763.src=wp.src; p764.src=wp.src; p765.src=wp.src; p771.src=wp.src; p772.src=bp.src; p773.src=wp.src; p774.src=wp.src; p775.src=wp.src;
+	                 p811.src=wp.src; p812.src=bp.src; p813.src=bp.src; p814.src=bp.src; p815.src=wp.src;	p821.src=bp.src; p822.src=wp.src; p823.src=wp.src; p824.src=wp.src; p825.src=bp.src;	p831.src=bp.src; p832.src=wp.src; p833.src=wp.src; p834.src=wp.src; p835.src=bp.src; p841.src=wp.src; p842.src=bp.src; p843.src=bp.src; p844.src=bp.src; p845.src=wp.src; p851.src=bp.src; p852.src=wp.src; p853.src=wp.src; p854.src=wp.src; p855.src=bp.src; p861.src=bp.src; p862.src=wp.src; p863.src=wp.src; p864.src=wp.src; p865.src=bp.src; p871.src=wp.src; p872.src=bp.src; p873.src=bp.src; p874.src=bp.src; p875.src=wp.src;
+	                 p911.src=wp.src; p912.src=bp.src; p913.src=bp.src; p914.src=bp.src; p915.src=wp.src;	p921.src=bp.src; p922.src=wp.src; p923.src=wp.src; p924.src=wp.src; p925.src=bp.src;	p931.src=bp.src; p932.src=wp.src; p933.src=wp.src; p934.src=wp.src; p935.src=bp.src; p941.src=wp.src; p942.src=bp.src; p943.src=bp.src; p944.src=bp.src; p945.src=bp.src; p951.src=wp.src; p952.src=wp.src; p953.src=wp.src; p954.src=wp.src; p955.src=bp.src; p961.src=wp.src; p962.src=wp.src; p963.src=wp.src; p964.src=bp.src; p965.src=wp.src; p971.src=wp.src; p972.src=bp.src; p973.src=bp.src; p974.src=wp.src; p975.src=wp.src;
+               }
+			   
+           </SCRIPT>
+      <BODY background="RedNeuronal.jpg" onload="inicializa();"> 
+         <P align=center><FONT face=verdana size=+2 color="FFFFFF"><B> Trabalho Feito por Carlos Eduardo Dantas</B></FONT></P>
+         <DIV id=texto style="TEXT-ALIGN: justify; TEXT-INDENT: 2.5cm">
+            <P> <Font color="FFFFFF"> Exercício de treinamento de <B> Redes Neurais </B> com aplicação do algoritmo <B> Back Propagation </Font> </B><BR><BR></P></DIV>
+         <TABLE align=center bgColor=#cccccc border=0 cellPadding=0 cellSpacing=0 width=610><!-- tabela com 10 mapas de pixels para reconhecimento -->
+            <TBODY>
+            <TR height=5>
+            <TD><FONT size=-2>&nbsp;</FONT></TD>
+            <TR>
+               <TD width=5>&nbsp;</TD>
+               <TD width=50><!--cada mapa  (numero) eh uma coluna  [numero 0]-->
+                  <TABLE border=0 cellPadding=0 cellSpacing=0><!-- cada numero eh uma tabela -->
+                   <TBODY>
+                    <TR>
+                      <TD><IMG border=0 name=p011 onclick=toggle(p011) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p012 onclick=toggle(p012) 
+                      src="bpix.gif"></TD>
+                      <TD><IMG border=0 name=p013 onclick=toggle(p013) 
+                      src="bpix.gif"></TD>
+                      <TD><IMG border=0 name=p014 onclick=toggle(p014) 
+                      src="bpix.gif"></TD>
+                      <TD><IMG border=0 name=p015 onclick=toggle(p015) 
+                      src="wpix.gif"></TD></TR>
+                    <TR>
+                      <TD><IMG border=0 name=p021 onclick=toggle(p021) 
+                      src="bpix.gif"></TD>
+                      <TD><IMG border=0 name=p022 onclick=toggle(p022) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p023 onclick=toggle(p023) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p024 onclick=toggle(p024) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p025 onclick=toggle(p025) 
+                      src="bpix.gif"></TD></TR>
+                    <TR>
+                      <TD><IMG border=0 name=p031 onclick=toggle(p031) 
+                      src="bpix.gif"></TD>
+                      <TD><IMG border=0 name=p032 onclick=toggle(p032) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p033 onclick=toggle(p033) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p034 onclick=toggle(p034) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p035 onclick=toggle(p035) 
+                      src="bpix.gif"></TD></TR>
+                    <TR>
+                      <TD><IMG border=0 name=p041 onclick=toggle(p041) 
+                      src="bpix.gif"></TD>
+                      <TD><IMG border=0 name=p042 onclick=toggle(p042) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p043 onclick=toggle(p043) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p044 onclick=toggle(p044) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p045 onclick=toggle(p045) 
+                      src="bpix.gif"></TD></TR>
+                    <TR>
+                      <TD><IMG border=0 name=p051 onclick=toggle(p051) 
+                      src="bpix.gif"></TD>
+                      <TD><IMG border=0 name=p052 onclick=toggle(p052) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p053 onclick=toggle(p053) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p054 onclick=toggle(p054) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p055 onclick=toggle(p055) 
+                      src="bpix.gif"></TD></TR>
+                    <TR>
+                      <TD><IMG border=0 name=p061 onclick=toggle(p061) 
+                      src="bpix.gif"></TD>
+                      <TD><IMG border=0 name=p062 onclick=toggle(p062) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p063 onclick=toggle(p063) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p064 onclick=toggle(p064) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p065 onclick=toggle(p065) 
+                      src="bpix.gif"></TD></TR>
+                    <TR>
+                      <TD><IMG border=0 name=p071 onclick=toggle(p071) 
+                      src="wpix.gif"></TD>
+                      <TD><IMG border=0 name=p072 onclick=toggle(p072) 
+                      src="bpix.gif"></TD>
+                      <TD><IMG border=0 name=p073 onclick=toggle(p073) 
+                      src="bpix.gif"></TD>
+                      <TD><IMG border=0 name=p074 onclick=toggle(p074) 
+                      src="bpix.gif"></TD>
+                      <TD><IMG border=0 name=p075 onclick=toggle(p075) 
+                      src="wpix.gif"></TD>
+                    </TR></TBODY></TABLE></TD>
+                  <TD width=50><!--cada mapa de pixels (numero) eh uma coluna  [numero 1]-->
+                   <TABLE border=0 cellPadding=0 cellSpacing=0><!-- cada numero eh uma tabela -->
+                    <TBODY>
+                    <TR>
+                       <TD><IMG border=0 name=p111 onclick=toggle(p111) 
+                       src="wpix.gif"></TD>
+                       <TD><IMG border=0 name=p112 onclick=toggle(p112) 
+                       src="wpix.gif"></TD>
+                       <TD><IMG border=0 name=p113 onclick=toggle(p113) 
+                       src="bpix.gif"></TD>
+                       <TD><IMG border=0 name=p114 onclick=toggle(p114) 
+                       src="wpix.gif"></TD>
+                       <TD><IMG border=0 name=p115 onclick=toggle(p115) 
+                       src="wpix.gif"></TD></TR>
+                     <TR>
+                       <TD><IMG border=0 name=p121 onclick=toggle(p121) 
+                       src="wpix.gif"></TD>
+                       <TD><IMG border=0 name=p122 onclick=toggle(p122)  
+                       src="bpix.gif"></TD>
+                       <TD><IMG border=0 name=p123 onclick=toggle(p123) 
+                       src="bpix.gif"></TD>
+                       <TD><IMG border=0 name=p124 onclick=toggle(p124) 
+                       src="wpix.gif"></TD>
+                       <TD><IMG border=0 name=p125 onclick=toggle(p125) 
+                       src="wpix.gif"></TD></TR>
+                     <TR>
+                       <TD><IMG border=0 name=p131 onclick=toggle(p131) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p132 onclick=toggle(p132) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p133 onclick=toggle(p133) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p134 onclick=toggle(p134) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p135 onclick=toggle(p135) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p141 onclick=toggle(p141) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p142 onclick=toggle(p142) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p143 onclick=toggle(p143) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p144 onclick=toggle(p144) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p145 onclick=toggle(p145) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p151 onclick=toggle(p151) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p152 onclick=toggle(p152) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p153 onclick=toggle(p153) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p154 onclick=toggle(p154) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p155 onclick=toggle(p155) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p161 onclick=toggle(p161) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p162 onclick=toggle(p162) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p163 onclick=toggle(p163) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p164 onclick=toggle(p164) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p165 onclick=toggle(p165) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p171 onclick=toggle(p171) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p172 onclick=toggle(p172) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p173 onclick=toggle(p173) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p174 onclick=toggle(p174) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p175 onclick=toggle(p175) 
+            src="wpix.gif"></TD></TR></TBODY></TABLE></TD>
+    <TD width=50><!--cada mapa de pixels (numero) eh uma coluna  [numero 2]-->
+      <TABLE border=0 cellPadding=0 cellSpacing=0><!-- cada numero eh uma tabela -->
+        <TBODY>
+        <TR>
+          <TD><IMG border=0 name=p211 onclick=toggle(p211) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p212 onclick=toggle(p212) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p213 onclick=toggle(p213) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p214 onclick=toggle(p214) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p215 onclick=toggle(p215) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p221 onclick=toggle(p221) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p222 onclick=toggle(p222) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p223 onclick=toggle(p223) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p224 onclick=toggle(p224) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p225 onclick=toggle(p225) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p231 onclick=toggle(p231) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p232 onclick=toggle(p232) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p233 onclick=toggle(p233) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p234 onclick=toggle(p234) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p235 onclick=toggle(p235) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p241 onclick=toggle(p241) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p242 onclick=toggle(p242) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p243 onclick=toggle(p243) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p244 onclick=toggle(p244) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p245 onclick=toggle(p245) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p251 onclick=toggle(p251) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p252 onclick=toggle(p252) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p253 onclick=toggle(p253) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p254 onclick=toggle(p254) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p255 onclick=toggle(p255) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p261 onclick=toggle(p261) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p262 onclick=toggle(p262) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p263 onclick=toggle(p263) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p264 onclick=toggle(p264) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p265 onclick=toggle(p265) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p271 onclick=toggle(p271) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p272 onclick=toggle(p272) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p273 onclick=toggle(p273) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p274 onclick=toggle(p274) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p275 onclick=toggle(p275) 
+            src="bpix.gif"></TD></TR></TBODY></TABLE></TD>
+    <TD width=50><!--cada mapa de pixels (numero) eh uma coluna  [numero 3]-->
+      <TABLE border=0 cellPadding=0 cellSpacing=0><!-- cada numero eh uma tabela -->
+        <TBODY>
+        <TR>
+          <TD><IMG border=0 name=p311 onclick=toggle(p311) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p312 onclick=toggle(p312) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p313 onclick=toggle(p313) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p314 onclick=toggle(p314) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p315 onclick=toggle(p315) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p321 onclick=toggle(p321) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p322 onclick=toggle(p322) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p323 onclick=toggle(p323) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p324 onclick=toggle(p324) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p325 onclick=toggle(p325) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p331 onclick=toggle(p331) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p332 onclick=toggle(p332) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p333 onclick=toggle(p333) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p334 onclick=toggle(p334) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p335 onclick=toggle(p335) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p341 onclick=toggle(p341) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p342 onclick=toggle(p342) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p343 onclick=toggle(p343) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p344 onclick=toggle(p344) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p345 onclick=toggle(p345) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p351 onclick=toggle(p351) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p352 onclick=toggle(p352) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p353 onclick=toggle(p353) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p354 onclick=toggle(p354) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p355 onclick=toggle(p355) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p361 onclick=toggle(p361) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p362 onclick=toggle(p362) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p363 onclick=toggle(p363) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p364 onclick=toggle(p364) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p365 onclick=toggle(p365) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p371 onclick=toggle(p371) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p372 onclick=toggle(p372) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p373 onclick=toggle(p373) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p374 onclick=toggle(p374) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p375 onclick=toggle(p375) 
+            src="wpix.gif"></TD></TR></TBODY></TABLE></TD>
+    <TD width=50><!--cada mapa de pixels (numero) eh uma coluna  [numero 4]-->
+      <TABLE border=0 cellPadding=0 cellSpacing=0><!-- cada numero eh uma tabela -->
+        <TBODY>
+        <TR>
+          <TD><IMG border=0 name=p411 onclick=toggle(p411) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p412 onclick=toggle(p412) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p413 onclick=toggle(p413) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p414 onclick=toggle(p414) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p415 onclick=toggle(p415) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p421 onclick=toggle(p421) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p422 onclick=toggle(p422) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p423 onclick=toggle(p423) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p424 onclick=toggle(p424) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p425 onclick=toggle(p425) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p431 onclick=toggle(p431) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p432 onclick=toggle(p432) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p433 onclick=toggle(p433) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p434 onclick=toggle(p434) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p435 onclick=toggle(p435) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p441 onclick=toggle(p441) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p442 onclick=toggle(p442) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p443 onclick=toggle(p443) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p444 onclick=toggle(p444) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p445 onclick=toggle(p445) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p451 onclick=toggle(p451) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p452 onclick=toggle(p452) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p453 onclick=toggle(p453) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p454 onclick=toggle(p454) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p455 onclick=toggle(p455) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p461 onclick=toggle(p461) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p462 onclick=toggle(p462) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p463 onclick=toggle(p463) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p464 onclick=toggle(p464) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p465 onclick=toggle(p465) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p471 onclick=toggle(p471) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p472 onclick=toggle(p472) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p473 onclick=toggle(p473) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p474 onclick=toggle(p474) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p475 onclick=toggle(p475) 
+            src="wpix.gif"></TD></TR></TBODY></TABLE></TD>
+    <TD width=50><!--cada mapa de pixels (numero) eh uma coluna  [numero 5]-->
+      <TABLE border=0 cellPadding=0 cellSpacing=0><!-- cada numero eh uma tabela -->
+        <TBODY>
+        <TR>
+          <TD><IMG border=0 name=p511 onclick=toggle(p511) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p512 onclick=toggle(p512) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p513 onclick=toggle(p513) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p514 onclick=toggle(p514) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p515 onclick=toggle(p515) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p521 onclick=toggle(p521) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p522 onclick=toggle(p522) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p523 onclick=toggle(p523) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p524 onclick=toggle(p524) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p525 onclick=toggle(p525) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p531 onclick=toggle(p531) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p532 onclick=toggle(p532) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p533 onclick=toggle(p533) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p534 onclick=toggle(p534) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p535 onclick=toggle(p535) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p541 onclick=toggle(p541) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p542 onclick=toggle(p542) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p543 onclick=toggle(p543) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p544 onclick=toggle(p544) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p545 onclick=toggle(p545) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p551 onclick=toggle(p551) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p552 onclick=toggle(p552) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p553 onclick=toggle(p553) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p554 onclick=toggle(p554) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p555 onclick=toggle(p555) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p561 onclick=toggle(p561) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p562 onclick=toggle(p562) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p563 onclick=toggle(p563) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p564 onclick=toggle(p564) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p565 onclick=toggle(p565) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p571 onclick=toggle(p571) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p572 onclick=toggle(p572) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p573 onclick=toggle(p573) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p574 onclick=toggle(p574) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p575 onclick=toggle(p575) 
+            src="wpix.gif"></TD></TR></TBODY></TABLE></TD>
+    <TD width=50><!--cada mapa de pixels (numero) eh uma coluna  [numero 6]-->
+      <TABLE border=0 cellPadding=0 cellSpacing=0><!-- cada numero eh uma tabela -->
+        <TBODY>
+        <TR>
+          <TD><IMG border=0 name=p611 onclick=toggle(p611) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p612 onclick=toggle(p612) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p613 onclick=toggle(p613) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p614 onclick=toggle(p614) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p615 onclick=toggle(p615) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p621 onclick=toggle(p621) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p622 onclick=toggle(p622) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p623 onclick=toggle(p623) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p624 onclick=toggle(p624) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p625 onclick=toggle(p625) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p631 onclick=toggle(p631) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p632 onclick=toggle(p632) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p633 onclick=toggle(p633) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p634 onclick=toggle(p634) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p635 onclick=toggle(p635) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p641 onclick=toggle(p641) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p642 onclick=toggle(p642) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p643 onclick=toggle(p643) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p644 onclick=toggle(p644) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p645 onclick=toggle(p645) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p651 onclick=toggle(p651) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p652 onclick=toggle(p652) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p653 onclick=toggle(p653) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p654 onclick=toggle(p654) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p655 onclick=toggle(p655) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p661 onclick=toggle(p661) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p662 onclick=toggle(p662) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p663 onclick=toggle(p663) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p664 onclick=toggle(p664) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p665 onclick=toggle(p665) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p671 onclick=toggle(p671) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p672 onclick=toggle(p672) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p673 onclick=toggle(p673) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p674 onclick=toggle(p674) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p675 onclick=toggle(p675) 
+            src="wpix.gif"></TD></TR></TBODY></TABLE></TD>
+    <TD width=50><!--cada mapa de pixels (numero) eh uma coluna  [numero 7]-->
+      <TABLE border=0 cellPadding=0 cellSpacing=0><!-- cada numero eh uma tabela -->
+        <TBODY>
+        <TR>
+          <TD><IMG border=0 name=p711 onclick=toggle(p711) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p712 onclick=toggle(p712) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p713 onclick=toggle(p713) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p714 onclick=toggle(p714) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p715 onclick=toggle(p715) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p721 onclick=toggle(p721) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p722 onclick=toggle(p722) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p723 onclick=toggle(p723) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p724 onclick=toggle(p724) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p725 onclick=toggle(p725) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p731 onclick=toggle(p731) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p732 onclick=toggle(p732) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p733 onclick=toggle(p733) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p734 onclick=toggle(p734) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p735 onclick=toggle(p735) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p741 onclick=toggle(p741) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p742 onclick=toggle(p742) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p743 onclick=toggle(p743) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p744 onclick=toggle(p744) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p745 onclick=toggle(p745) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p751 onclick=toggle(p751) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p752 onclick=toggle(p752) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p753 onclick=toggle(p753) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p754 onclick=toggle(p754) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p755 onclick=toggle(p755) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p761 onclick=toggle(p761) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p762 onclick=toggle(p762) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p763 onclick=toggle(p763) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p764 onclick=toggle(p764) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p765 onclick=toggle(p765) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p771 onclick=toggle(p771) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p772 onclick=toggle(p772) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p773 onclick=toggle(p773) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p774 onclick=toggle(p774) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p775 onclick=toggle(p775) 
+            src="wpix.gif"></TD></TR></TBODY></TABLE></TD>
+    <TD width=50><!--cada mapa de pixels (numero) eh uma coluna  [numero 8]-->
+      <TABLE border=0 cellPadding=0 cellSpacing=0><!-- cada numero eh uma tabela -->
+        <TBODY>
+        <TR>
+          <TD><IMG border=0 name=p811 onclick=toggle(p811) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p812 onclick=toggle(p812) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p813 onclick=toggle(p813) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p814 onclick=toggle(p814) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p815 onclick=toggle(p815) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p821 onclick=toggle(p821) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p822 onclick=toggle(p822) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p823 onclick=toggle(p823) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p824 onclick=toggle(p824) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p825 onclick=toggle(p825) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p831 onclick=toggle(p831) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p832 onclick=toggle(p832) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p833 onclick=toggle(p833) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p834 onclick=toggle(p834) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p835 onclick=toggle(p835) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p841 onclick=toggle(p841) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p842 onclick=toggle(p842) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p843 onclick=toggle(p843) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p844 onclick=toggle(p844) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p845 onclick=toggle(p845) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p851 onclick=toggle(p851) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p852 onclick=toggle(p852) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p853 onclick=toggle(p853) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p854 onclick=toggle(p854) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p855 onclick=toggle(p855) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p861 onclick=toggle(p861) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p862 onclick=toggle(p862) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p863 onclick=toggle(p863) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p864 onclick=toggle(p864) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p865 onclick=toggle(p865) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p871 onclick=toggle(p871) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p872 onclick=toggle(p872) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p873 onclick=toggle(p873) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p874 onclick=toggle(p874) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p875 onclick=toggle(p875) 
+            src="wpix.gif"></TD></TR></TBODY></TABLE></TD>
+    <TD width=50><!--cada mapa de pixels (numero) eh uma coluna  [numero 9]-->
+      <TABLE border=0 cellPadding=0 cellSpacing=0><!-- cada numero eh uma tabela -->
+        <TBODY>
+        <TR>
+          <TD><IMG border=0 name=p911 onclick=toggle(p911) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p912 onclick=toggle(p912) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p913 onclick=toggle(p913) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p914 onclick=toggle(p914) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p915 onclick=toggle(p915) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p921 onclick=toggle(p921) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p922 onclick=toggle(p922) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p923 onclick=toggle(p923) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p924 onclick=toggle(p924) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p925 onclick=toggle(p925) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p931 onclick=toggle(p931) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p932 onclick=toggle(p932) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p933 onclick=toggle(p933) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p934 onclick=toggle(p934) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p935 onclick=toggle(p935) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p941 onclick=toggle(p941) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p942 onclick=toggle(p942) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p943 onclick=toggle(p943) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p944 onclick=toggle(p944) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p945 onclick=toggle(p945) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p951 onclick=toggle(p951) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p952 onclick=toggle(p952) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p953 onclick=toggle(p953) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p954 onclick=toggle(p954) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p955 onclick=toggle(p955) 
+            src="bpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p961 onclick=toggle(p961) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p962 onclick=toggle(p962) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p963 onclick=toggle(p963) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p964 onclick=toggle(p964) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p965 onclick=toggle(p965) 
+            src="wpix.gif"></TD></TR>
+        <TR>
+          <TD><IMG border=0 name=p971 onclick=toggle(p971) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p972 onclick=toggle(p972) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p973 onclick=toggle(p973) 
+            src="bpix.gif"></TD>
+          <TD><IMG border=0 name=p974 onclick=toggle(p974) 
+            src="wpix.gif"></TD>
+          <TD><IMG border=0 name=p975 onclick=toggle(p975) 
+            src="wpix.gif"></TD>
+  </TR></TBODY></TABLE></TD></TR>
+  <TR>
+    <TD><FONT size=-3>&nbsp;</FONT></TD></TR>
+  <TR>
+    <TD width=5>&nbsp;</TD>
+    <TD align=middle width=50><INPUT border=0 id='Botao0' onclick=testa(0) onmouseout="explicaBotoes.style.visibility='hidden'" onmouseover="explicaBotoes.style.visibility=''" style="BACKGROUND: #ffffff" type=button value="    0    "></TD>
+    <TD align=middle width=50><INPUT border=0 id='Botao1' onclick=testa(1) onmouseout="explicaBotoes.style.visibility='hidden'" onmouseover="explicaBotoes.style.visibility=''" style="BACKGROUND: #ffffff" type=button value="    1    "></TD>
+    <TD align=middle width=50><INPUT border=0 id='Botao2' onclick=testa(2) onmouseout="explicaBotoes.style.visibility='hidden'" onmouseover="explicaBotoes.style.visibility=''" style="BACKGROUND: #ffffff" type=button value="    2    "></TD>
+    <TD align=middle width=50><INPUT border=0 id='Botao3' onclick=testa(3) onmouseout="explicaBotoes.style.visibility='hidden'" onmouseover="explicaBotoes.style.visibility=''" style="BACKGROUND: #ffffff" type=button value="    3    "></TD>
+    <TD align=middle width=50><INPUT border=0 id='Botao4' onclick=testa(4) onmouseout="explicaBotoes.style.visibility='hidden'" onmouseover="explicaBotoes.style.visibility=''" style="BACKGROUND: #ffffff" type=button value="    4    "></TD>
+    <TD align=middle width=50><INPUT border=0 id='Botao5' onclick=testa(5) onmouseout="explicaBotoes.style.visibility='hidden'" onmouseover="explicaBotoes.style.visibility=''" style="BACKGROUND: #ffffff" type=button value="    5    "></TD>
+    <TD align=middle width=50><INPUT border=0 id='Botao6' onclick=testa(6) onmouseout="explicaBotoes.style.visibility='hidden'" onmouseover="explicaBotoes.style.visibility=''" style="BACKGROUND: #ffffff" type=button value="    6    "></TD>
+    <TD align=middle width=50><INPUT border=0 id='Botao7' onclick=testa(7) onmouseout="explicaBotoes.style.visibility='hidden'" onmouseover="explicaBotoes.style.visibility=''" style="BACKGROUND: #ffffff" type=button value="    7    "></TD>
+    <TD align=middle width=50><INPUT border=0 id='Botao8' onclick=testa(8) onmouseout="explicaBotoes.style.visibility='hidden'" onmouseover="explicaBotoes.style.visibility=''" style="BACKGROUND: #ffffff" type=button value="    8    "></TD>
+    <TD align=middle width=50><INPUT border=0 id='Botao9' onclick=testa(9) onmouseout="explicaBotoes.style.visibility='hidden'" onmouseover="explicaBotoes.style.visibility=''" style="BACKGROUND: #ffffff" type=button value="    9    "></TD></TR>
+  <TR>
+    <TD><FONT size=-3>&nbsp;</FONT>
+    </TD></TR>
+  <TR>
+      <TD width=5>&nbsp;</TD>    
+      <TD WIDTH=50> <input border=0 id='quantos0' style="VALUE: 0" SIZE=5 MAXLENGTH=3 onmouseout="explicaEdits.style.visibility='hidden'" onmouseover="explicaEdits.style.visibility=''"> </TD>
+      <TD WIDTH=50> <input border=0 id='quantos1' style="VALUE: 0" SIZE=5 MAXLENGTH=3 onmouseout="explicaEdits.style.visibility='hidden'" onmouseover="explicaEdits.style.visibility=''"> </TD>
+      <TD WIDTH=50> <input border=0 id='quantos2' style="VALUE: 0" SIZE=5 MAXLENGTH=3 onmouseout="explicaEdits.style.visibility='hidden'" onmouseover="explicaEdits.style.visibility=''"> </TD>
+      <TD WIDTH=50> <input border=0 id='quantos3' style="VALUE: 0" SIZE=5 MAXLENGTH=3 onmouseout="explicaEdits.style.visibility='hidden'" onmouseover="explicaEdits.style.visibility=''"> </TD>
+      <TD WIDTH=50> <input border=0 id='quantos4' style="VALUE: 0" SIZE=5 MAXLENGTH=3 onmouseout="explicaEdits.style.visibility='hidden'" onmouseover="explicaEdits.style.visibility=''"> </TD>
+      <TD WIDTH=50> <input border=0 id='quantos5' style="VALUE: 0" SIZE=5 MAXLENGTH=3 onmouseout="explicaEdits.style.visibility='hidden'" onmouseover="explicaEdits.style.visibility=''"> </TD>
+      <TD WIDTH=50> <input border=0 id='quantos6' style="VALUE: 0" SIZE=5 MAXLENGTH=3 onmouseout="explicaEdits.style.visibility='hidden'" onmouseover="explicaEdits.style.visibility=''"> </TD>
+      <TD WIDTH=50> <input border=0 id='quantos7' style="VALUE: 0" SIZE=5 MAXLENGTH=3 onmouseout="explicaEdits.style.visibility='hidden'" onmouseover="explicaEdits.style.visibility=''"> </TD>
+      <TD WIDTH=50> <input border=0 id='quantos8' style="VALUE: 0" SIZE=5 MAXLENGTH=3 onmouseout="explicaEdits.style.visibility='hidden'" onmouseover="explicaEdits.style.visibility=''"> </TD>    
+      <TD WIDTH=50> <input border=0 id='quantos9' style="VALUE: 0" SIZE=5 MAXLENGTH=3 onmouseout="explicaEdits.style.visibility='hidden'" onmouseover="explicaEdits.style.visibility=''"> </TD>     
+  </TR> 
+</TBODY></TABLE><BR>
+<TABLE align=center border=0 cellPadding=0 cellSpacing=0>
+  <TBODY>
+  <TR style="BACKGROUND: #000000">
+    <TD><FONT color=#ffffff face=arial,helvetica 
+      size=-1><B>&nbsp;Característica da Rede Neural:</B></FONT></TD>
+    <TD>&nbsp;</TD></TR>
+  <TR>
+    <TD><FONT face="verdana" color="FFFFFF">Número de neurônios da camada 
+      oculta: </FONT></TD>
+    <TD><FONT face="Times New Roman"><INPUT id='CamadaOculta'
+      onchange=inicializa() value='10'
+      onmouseout="explicaNroNeur.style.visibility='hidden'" 
+      onmouseover="explicaNroNeur.style.visibility=''" size=5></FONT></TD></TR>
+  <TR>
+    <TD><FONT face="verdana" color="FFFFFF">Taxa de aprendizagem da rede neural: 
+      </FONT></TD>
+    <TD><FONT face="Times New Roman"><INPUT id='TaxaAprendizagem' 
+      onchange="u = this.value" value='0.01'
+      onmouseout="explicaTaxaApr.style.visibility='hidden'" 
+      onmouseover="explicaTaxaApr.style.visibility=''" size=5></FONT></TD></TR>
+  <TR>
+    <TD><FONT face="verdana" color="FFFFFF">Épocas:</FONT></TD>
+    <TD><INPUT id='DisplayEpocas' value='50'
+      onmouseout="explicaEpocas.style.visibility='hidden'" 
+      onmouseover="explicaEpocas.style.visibility=''" 
+size=5></TD></TR></TBODY></TABLE>
+<P align=center>
+<INPUT border=0 name=RealizarTreinamento onclick=Treinamento() onmouseout="explicaTreinamento.style.visibility='hidden'" onmouseover="explicaTreinamento.style.visibility=''" type=button value="Realizar Treinamento"> 
+<INPUT border=0 name=RstRede onclick=inicializa(); onmouseout="explicaRstRede.style.visibility='hidden'" onmouseover="explicaRstRede.style.visibility=''" type=button value="Reset Rede Neural"> 
+<INPUT border=0 name=RstEntradas onclick=resetEntradas() onmouseout="explicaRstEntradas.style.visibility='hidden'" onmouseover="explicaRstEntradas.style.visibility=''" type=button value="Reset Entradas"> 
+<br>
+<center><INPUT id='Status' value='' disabled='true'
+      onmouseout="explicaEpocas.style.visibility='hidden'" 
+      onmouseover="explicaEpocas.style.visibility=''" 
+size=100> </center>
+
+<TABLE align=center border=0 cellPadding=0 cellSpacing=0 width=600>
+  <TBODY>
+  <TR>
+    <TD><BR>
+    <font color="FFFFFF">
+      <DIV id=explicaTreinamento 
+      style="POSITION: absolute; TEXT-ALIGN: justify; VISIBILITY: hidden">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Realiza 
+      o treinamento da rede neural cujas caracteísticas foram definidas pelo 
+      usuário. O progresso do aprendizado pode ser monitorado através da barra 
+      de <I>"status"</I> do seu browser, onde são exibidas quantas épocas foram 
+      apresentadas à rede neural e qual o Erro Médio Quadrático (EMQ) do atual 
+      estágio de aprendizado. </DIV>
+      <DIV id=explicaRstRede 
+      style="POSITION: absolute; TEXT-ALIGN: justify; VISIBILITY: hidden">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Apaga 
+      qualquer possível treinamento já feito na rede neural e inicializa seus 
+      coeficientes com valores randômicos, resultando num reconhecimento 
+      indefinido a partir de uma entrada qualquer. A mudança do número de 
+      neurônios da camada oculta da rede neural implicam, também, na 
+      reinicialização dos pesos para o novo número de neurônios. </DIV>
+      <DIV id=explicaRstEntradas 
+      style="POSITION: absolute; TEXT-ALIGN: justify; VISIBILITY: hidden">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nesta 
+      opção as matrizes de entrada da rede neural são restabelecidas a seus 
+      valores <I>"default"</I>. </DIV>
+      <DIV id=explicaNroNeur 
+      style="POSITION: absolute; TEXT-ALIGN: justify; VISIBILITY: hidden">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Define 
+      o número de neurônios da camada oculta da rede neural, quanto maior o 
+      número de neurônios, melhor é o aprendizado, porém, mais lento, o que pode 
+      gerar problemas em alguns browsers. </DIV>
+      <DIV id=explicaTaxaApr 
+      style="POSITION: absolute; TEXT-ALIGN: justify; VISIBILITY: hidden">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Neste 
+      campo define-se a taxa de aprendizado da rede neural, ou seja, o valor 
+      pelo qual o erro (diferença entre saída correta e saída instantânea da 
+      rede neural) é multiplicado para atualizar os pesos sinápticos dos 
+      neurônios ocultos e de saída. </DIV>
+      <DIV id=explicaEpocas 
+      style="POSITION: absolute; TEXT-ALIGN: justify; VISIBILITY: hidden">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;O 
+      número de épocas para o qual a rede neural será treinada. Uma época 
+      corresponde à apresentação de todos os vetores de entrada (10 números) 
+      para a rede neural e atualização dos pesos sinápticos para cada vetor 
+      apresentado. A cada época também é calculado o Erro Médio Quadrático (EMQ) 
+      que serve como métrica do aprendizado da rede neural. </DIV>
+      <DIV id=explicaBotoes 
+      style="POSITION: absolute; TEXT-ALIGN: justify; VISIBILITY: hidden">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Cada 
+      botão com um número funciona como uma entrada fornecida para a rede 
+      neural. Quando uma entrada é apresentada à rede, os valores de saída da 
+      rede são codificados em uma escala de cinza de 0 a 255, onde quando maior 
+      o valor de uma saída, mais escuro ficará o respectivo botão. </DIV>
+      <DIV id=explicaEdits
+      style="POSITION: absolute; TEXT-ALIGN: justify; VISIBILITY: hidden">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Enquanto
+       que nos botões eles escurecem a medida que a saida vai se tornando máxima, neste campo são
+      colocados os valores reais de saída, variando de 0 a 255
+  </DIV> </font></TD></TR></TBODY></TABLE>
+</BODY></HTML>
