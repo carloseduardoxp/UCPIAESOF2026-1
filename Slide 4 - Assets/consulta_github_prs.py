@@ -26,11 +26,16 @@ def run_query(query):
     
     return data
 
+#search(query: "\\"claude.ai/share/\\" is:pr is:merged in:title,body",
+#search(query: "\\"chat.openai.com/share/\\" is:pr is:merged in:title,body",
+#search(query: "\\"g.co/gemini/share/\\" is:pr is:merged in:title,body",
+#search(query: "\\"chat.deepseek.com/\\" is:pr is:merged in:title,body",
+#search(query: "\\"perplexity.ai/search/\\" is:pr is:merged in:title,body",
 def query_composer(cursor=None):
     cursor_part = f', after: "{cursor}"' if cursor else ""
     query = f"""
                query {{
-                  search(query: "chat.deepseek.com is:pr is:merged in:title,body",
+                  search(query: "\\"perplexity.ai/search\\" is:pr is:merged in:title,body",
                     type: ISSUE,
                     first: 100{cursor_part}) {{
                         pageInfo {{
