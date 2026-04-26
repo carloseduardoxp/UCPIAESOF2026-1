@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Refatorador de Código com LLM</title>
+</head>
+<body>
+  <h1>Refatorador de Código com LLM</h1>
+
+  <label for="codigo">Código original:</label><br>
+  <textarea id="codigo" rows="10" cols="80"></textarea>
+
+  <br><br>
+
+  <button onclick="refatorarCodigo()">Refatorar código</button>
+
+  <br><br>
+
+  <label for="resultado">Código refatorado:</label><br>
+  <textarea id="resultado" rows="10" cols="80" readonly></textarea>
+
+  <script>
+    async function refatorarCodigo() {
+      const codigo = document.getElementById("codigo").value;
+
+      const response = await fetch("http://localhost:5000/llm/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          prompt: codigo
+        })
+      });
+
+      const data = await response.json();
+
+      document.getElementById("resultado").value = data.response;
+    }
+  </script>
+</body>
+</html>
